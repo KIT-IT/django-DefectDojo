@@ -6,7 +6,8 @@ from dojo import __version__
 import environ
 from netaddr import IPNetwork, IPSet
 import json
-
+import ldap
+from django_auth_ldap.config import LDAPSearch, GroupOfNamesType
 # See https://documentation.defectdojo.com/getting_started/configuration/ for options
 # how to tune the configuration to your needs.
 
@@ -14,6 +15,10 @@ root = environ.Path(__file__) - 3  # Three folders back
 
 # reference: https://pypi.org/project/django-environ/
 env = environ.Env(
+    # LDAP
+    DD_LDAP_SERVER_URI=(str, 'ldaps://s1-adc-01.corp.ekassir.com:636'),
+    DD_LDAP_BIND_DN=(str, 'cn=DevOps_LDAP,OU=DevOps,OU=Security,OU=Groups,OU=Other,OU=SPB,OU=corp,DC=corp,DC=ekassir,DC=com'),
+    DD_LDAP_BIND_PASSWORD=(str, 'cluster10&'),
     # Set casting and default values
     DD_SITE_URL=(str, 'http://localhost:8080'),
     DD_DEBUG=(bool, False),
@@ -1468,6 +1473,10 @@ LOGGING = {
         },
     },
     'loggers': {
+        "django_auth_ldap": {
+            "level": "DEBUG", 
+            "handlers": ["console"]
+        },
         'django.request': {
             'handlers': ['mail_admins', 'console'],
             'level': '%s' % LOG_LEVEL,
@@ -1604,3 +1613,40 @@ FILE_UPLOAD_TYPES = env("DD_FILE_UPLOAD_TYPES")
 AUDITLOG_DISABLE_ON_RAW_SAVE = False
 #  You can set extra Jira headers by suppling a dictionary in header: value format (pass as env var like "headr_name=value,another_header=anohter_value")
 ADDITIONAL_HEADERS = env('DD_ADDITIONAL_HEADERS')
+
+# LDAP
+AUTH_LDAP_SERVER_URI = env('DD_LDAP_SERVER_URI')
+AUTH_LDAP_BIND_DN = env('DD_LDAP_BIND_DN')
+AUTH_LDAP_BIND_PASSWORD = env('DD_LDAP_BIND_PASSWORD')
+AUTH_LDAP_USER_SEARCH = LDAPSearch(
+    "cn=DevOps_LDAP,OU=DevOps,OU=Security,OU=Groups,OU=Other,OU=SPB,OU=corp,DC=corp,DC=ekassir,DC=com", ldap.SCOPE_SUBTREE, "(uid=%(user)s)"
+)
+
+AUTH_LDAP_USER_ATTR_MAP = {
+    "first_name": "givenName",
+    "last_name": "sn",
+    "email": "mail",
+}
+
+# Set up the basic group parameters.
+AUTH_LDAP_GROUP_SEARCH = LDAPSearch(
+    "dc=corp,dc=ekassir,dc=com",
+    ldap.SCOPE_SUBTREE,
+    "(objectClass=groupOfNames)",
+)
+AUTH_LDAP_GROUP_TYPE = GroupOfNamesType(name_attr="cn")
+
+# Simple group restrictions
+AUTH_LDAP_REQUIRE_GROUP = "cn=DevOps_LDAP,ou=DevOps,dc=corp,dc=ekassir,dc=com"
+
+AUTH_LDAP_USER_FLAGS_BY_GROUP = {
+    "is_active": "cn=DD_USER_ACTIVE,ou=Groups,dc=example,dc=com",
+    "is_staff": "cn=DD_USER_STAFF,ou=Groups,dc=example,dc=com",
+    "is_superuser": "cn=DevOps_LDAP,ou=DevOps,dc=corp,dc=ekassir,dc=com",
+}
+
+AUTHENTICATION_BACKENDS = (
+    'django_auth_ldap.backend.LDAPBackend',
+    'django.contrib.auth.backends.RemoteUserBackend',
+    'django.contrib.auth.backends.ModelBackend',
+)

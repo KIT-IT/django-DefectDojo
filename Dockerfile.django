@@ -11,6 +11,9 @@ WORKDIR /app
 RUN \
   apt-get -y update && \
   apt-get -y install --no-install-recommends \
+    libldap2-dev \
+    libsasl2-dev \
+    ldap-utils \
     gcc \
     build-essential \
     dnsutils \

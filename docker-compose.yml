@@ -12,7 +12,7 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile.nginx
-    image: "defectdojo/defectdojo-nginx:${NGINX_VERSION:-latest}"
+    image: "10.0.21.14:8082/defectdojo/defectdojo-nginx:1.0.4"
     profiles: 
       - mysql-rabbitmq
       - mysql-redis
@@ -22,6 +22,9 @@ services:
       - uwsgi
     environment:
       NGINX_METRICS_ENABLED: "${NGINX_METRICS_ENABLED:-false}"
+      USE_TLS: false
+      GENERATE_TLS_CERTIFICATE: false
+
     volumes:
       - defectdojo_media:/usr/share/nginx/html/media
     ports:
@@ -33,12 +36,24 @@ services:
         published: ${DD_TLS_PORT:-8443}
         protocol: tcp
         mode: host
+    # secrets:
+    #   - source: nginxcrt
+    #     target: /etc/nginx/ssl/nginx.crt
+    #     uid: '9000'
+    #     gid: '9000'image
+    #     mode: 0440
+    #   - source: nginxkey
+    #     target: /etc/nginx/ssl/nginx.key
+    #     uid: '9000'
+    #     gid: '9000'
+    #     mode: 0440
+
   uwsgi:
     build:
       context: ./
       dockerfile: Dockerfile.django
       target: django
-    image: "defectdojo/defectdojo-django:${DJANGO_VERSION:-latest}"
+    image: "10.0.21.14:8082/defectdojo/defectdojo-django:1.0.6"
     profiles: 
       - mysql-rabbitmq
       - mysql-redis
@@ -49,20 +64,30 @@ services:
       - postgres
     entrypoint: ['/wait-for-it.sh', '${DD_DATABASE_HOST}:${DD_DATABASE_PORT}', '-t', '30', '--', '/entrypoint-uwsgi.sh']
     environment:
-      DD_DEBUG: 'False'
+      DD_DEBUG123: "20"
+      DD_DEBUG: 'True'
       DD_DJANGO_METRICS_ENABLED: "${DD_DJANGO_METRICS_ENABLED:-False}"
       DD_ALLOWED_HOSTS: "${DD_ALLOWED_HOSTS:-*}"
       DD_DATABASE_URL: ${DD_DATABASE_URL}
       DD_CELERY_BROKER_URL: ${DD_CELERY_BROKER_URL}
       DD_SECRET_KEY: "${DD_SECRET_KEY:-hhZCp@D28z!n@NED*yB!ROMt+WzsY*iq}"
       DD_CREDENTIAL_AES_256_KEY: "${DD_CREDENTIAL_AES_256_KEY:-&91a*agLqesc*0DJ+2*bAbsUZfR*4nLw}"
+      DD_LDAP_SERVER_URI: "${DD_LDAP_SERVER_URI:-ldap://s1-adc-01.corp.ekassir.com}"
+      DD_LDAP_BIND_DN: "${DD_LDAP_BIND_DN:-cn=DevOps_LDAP,ou=DevOps,ou=Security,ou=Groups,ou=Other,ou=SPB,ou=corp,dc=corp,dc=ekassir,dc=com}"
+      DD_LDAP_BIND_PASSWORD: "${DD_LDAP_BIND_PASSWORD:-cluster10&}"
     volumes:
         - type: bind
           source: ./docker/extra_settings
           target: /app/docker/extra_settings
         - "defectdojo_media:${DD_MEDIA_ROOT:-/app/media}"
+    secrets:
+      - source: settingsdistpy
+        target: /app/dojo/settings/settings.dist.py
+        uid: '9000'
+        gid: '9000'
+        mode: 0440
   celerybeat:
-    image: "defectdojo/defectdojo-django:${DJANGO_VERSION:-latest}"
+    image: "10.0.21.14:8082/defectdojo/defectdojo-django:1.0.6"
     profiles: 
       - mysql-rabbitmq
       - mysql-redis
@@ -83,7 +108,7 @@ services:
           source: ./docker/extra_settings
           target: /app/docker/extra_settings
   celeryworker:
-    image: "defectdojo/defectdojo-django:${DJANGO_VERSION:-latest}"
+    image: "10.0.21.14:8082/defectdojo/defectdojo-django:1.0.6"
     profiles: 
       - mysql-rabbitmq
       - mysql-redis
@@ -106,7 +131,7 @@ services:
           target: /app/docker/extra_settings
         - "defectdojo_media:${DD_MEDIA_ROOT:-/app/media}"
   initializer:
-    image: "defectdojo/defectdojo-django:${DJANGO_VERSION:-latest}"
+    image: "10.0.21.14:8082/defectdojo/defectdojo-django:1.0.6"
     profiles: 
       - mysql-rabbitmq
       - mysql-redis
@@ -130,7 +155,8 @@ services:
           source: ./docker/extra_settings
           target: /app/docker/extra_settings
   mysql:
-    image: mysql:5.7.40@sha256:f5e2d4d7dccdc3f2a1d592bd3f0eb472b2f72f9fb942a84ff5b5cc049fe63a04
+    #image: mysql:5.7.40@sha256:f5e2d4d7dccdc3f2a1d592bd3f0eb472b2f72f9fb942a84ff5b5cc049fe63a04
+    image: mysql:8.0.33@sha256:13e429971e970ebcb7bc611de52d71a3c444247dc67cf7475a02718f6a5ef559
     profiles: 
       - mysql-rabbitmq
       - mysql-redis
@@ -173,3 +199,11 @@ volumes:
   defectdojo_media: {}
   defectdojo_rabbitmq: {}
   defectdojo_redis: {}
+
+secrets:
+  settingsdistpy:
+    file: ./custom/settings.dist.py
+  nginxcrt:
+    file: ./docker/certs/nginxgen/nginx.crt
+  nginxkey:
+    file: ./docker/certs/nginxgen/nginx.key

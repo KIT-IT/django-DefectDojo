@@ -11,6 +11,9 @@ WORKDIR /app
 RUN \
   apt-get -y update && \
   apt-get -y install --no-install-recommends \
+    libldap2-dev \
+    libsasl2-dev \
+    ldap-utils \
     gcc \
     build-essential \
     dnsutils \
@@ -42,13 +45,20 @@ ENV \
   node="nodejs"
 RUN \
   apt-get -y update && \
-  apt-get -y install --no-install-recommends apt-transport-https ca-certificates curl wget gnupg && \
+  echo ############################################## && \
+  apt-get -y install --no-install-recommends apt-transport-https ca-certificates curl wget gnupg2 && \
+  echo ############################################## && \
   curl -sSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add --no-tty - && \
+  echo ############################################## && \
   echo 'deb https://deb.nodesource.com/node_14.x bullseye main' > /etc/apt/sources.list.d/nodesource.list && \
+  echo ############################################## && \
   echo 'deb-src https://deb.nodesource.com/node_14.x bullseye main' >> /etc/apt/sources.list.d/nodesource.list && \
+  echo ############################################## && \
   apt-get update -y -o Dir::Etc::sourcelist="sources.list.d/nodesource.list" \
+  echo ############################################## && \
   -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0" && \
-  curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - && \
+  echo ############################################## && \
+  curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg  | apt-key add - && \
   wget https://github.com/yarnpkg/yarn/releases/download/v1.22.10/yarn_1.22.10_all.deb && \
   dpkg -i yarn_1.22.10_all.deb && \
   echo "$(yarn --version)" && \
@@ -66,8 +76,28 @@ RUN pip3 install \
 	-r ./requirements.txt
 
 COPY components/ ./components/
+
+RUN apt install curl
+
+COPY pubkey.gpg ./components
+
+# RUN \
+#   cd components && \
+#   ls && \
+#   apt install gnupg2 -y && \
+#   gpg2 --version && \
+#   apt-key add - && \
+#   echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list  && \
+#   apt update && \
+RUN \
+  apt install nodejs npm -y && \
+  npm install --global yarn && \
+  yarn --version
+
 RUN \
   cd components && \
+  ls && \
+  yarn install && \
   yarn
 
 COPY manage.py ./
@@ -94,7 +124,7 @@ ENV \
   DD_UWSGI_HOST="uwsgi" \
   DD_UWSGI_PORT="3031" \
   GENERATE_TLS_CERTIFICATE="false" \
-  USE_TLS="false" \
+  USE_TLS="true" \
   NGINX_METRICS_ENABLED="false" \
   METRICS_HTTP_AUTH_USER="" \
   METRICS_HTTP_AUTH_PASSWORD=""
